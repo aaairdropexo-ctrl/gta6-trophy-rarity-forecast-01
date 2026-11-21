@@ -175,15 +175,15 @@ def _jump_variance(case):
     return min(sum(squares) / len(squares), 1.0)
 
 
-def _fit_players(case, x_target):
+def _fit_players(case, x_target, xs_all):
     """Slope of ln(players) on log time, anchored at the last read."""
     hist = case["history"]
     xs, ys = [], []
-    for read in hist:
+    for k, read in enumerate(hist):
         n = read.get("players_tracked")
         if n is None or n <= 0:
             continue
-        xs.append(_x_of(read.get("slot") or read.get("at") or ""))
+        xs.append(xs_all[k])
         ys.append(math.log(float(n)))
     fit = _fit_line(xs, ys)
     if fit is None:
@@ -195,7 +195,7 @@ def _fit_players(case, x_target):
     return slope, max(n_pred, n_last)
 
 
-def _fit_earners(case, x_target, x_last, last_rates):
+def _fit_earners(case, x_target, x_last, last_rates, xs_all):
     """Per-trophy earners slope (shrunk to tier mean) and fit variance.
 
     Anchored at each trophy's last observed earner count so a shaky
@@ -206,12 +206,12 @@ def _fit_earners(case, x_target, x_last, last_rates):
     raw = []
     for i, trophy in enumerate(trophies):
         xs, ys = [], []
-        for read in hist:
+        for k, read in enumerate(hist):
             rates = read.get("rates") or []
             n = read.get("players_tracked")
             if i >= len(rates) or rates[i] is None or not n:
                 continue
-            xs.append(_x_of(read.get("slot") or read.get("at") or ""))
+            xs.append(xs_all[k])
             ys.append(math.log(float(rates[i]) * float(n) / 100.0 + 0.5))
         fit = _fit_line(xs, ys)
         raw.append(fit)
@@ -262,6 +262,11 @@ def _forecast_case(case, name):
     horizon_days = float(case["horizon_minutes"]) / 1440.0
     x_target = _x_of(case.get("target") or "")
     x_last = _x_of(hist[-1].get("slot") or hist[-1].get("at") or "")
+    # Log-time per read, computed once: _fit_earners used to re-parse
+    # every read's timestamp for every trophy (55x336 parses on a full
+    # final history), which dominated run time — the tie-break.
+    xs_all = [_x_of(read.get("slot") or read.get("at") or "")
+              for read in hist]
     base_spread = 0.6 * math.sqrt(horizon_days)
     flat = _history_is_flat(case)
 
@@ -273,9 +278,10 @@ def _forecast_case(case, name):
         slopes = [0.0] * len(trophies)
         resid_vars = [0.0] * len(trophies)
     else:
-        _slope_n, n_pred = _fit_players(case, x_target)
+        _slope_n, n_pred = _fit_players(case, x_target, xs_all)
         jump_var = _jump_variance(case)
-        slopes, resid_vars = _fit_earners(case, x_target, x_last, last)
+        slopes, resid_vars = _fit_earners(case, x_target, x_last, last,
+                                          xs_all)
     dx = x_target - x_last
 
     # A trophy every read shows at 100% while the tracked base grew a
