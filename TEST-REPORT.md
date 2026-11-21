@@ -92,3 +92,55 @@ before the fix the tier ceiling dragged it to 95.0 and loss was 0.2106).
   in a recorded session starting after the 19 Nov 11:30 UTC opening.
 - R4 — House superbot final score is unknown until grading; the prize
   needs a strictly lower loss than the best house entry AND a top-20 rank.
+
+## 7. Improvement v2 (21 Nov ~17:50 WIB) — live-page backtest, real data
+
+The kit's practice answers are not in the kit, so no local practice loss
+exists. But the source page is public, so the improvement was measured
+against the LIVE Exophase page, crawled 21 Nov 10:43 UTC: all 55 current
+rates (sum 157.89 vs 147.78 at the 638 era; the 100% trophy still
+100.00%). Backtest: run the model on the p00 flat history (last read
+19 Nov 02:30Z, 638 players) with target = the live crawl, horizon
+3,373 min (~2.5 days), score pinball-logit vs the live rates. This is a
+REAL out-of-sample holdout, not a synthetic world built on the model's
+own assumptions.
+
+| Variant | Loss vs live rates |
+|---------|-------------------|
+| Persistence (last rates) | 3.1183 |
+| Model v1 (base spread 0.5) | 2.1885 |
+| Model v2 (base spread 0.6) | 2.1229 |
+| v2 + spread x1.25 (post-hoc) | 1.9671 |
+| v2 + universal-tight (post-hoc) | 2.0246 |
+| v2 + median x0.7 (post-hoc) | 1.9189 |
+
+Findings, and what was (not) changed:
+- The model beats persistence by ~0.93 on a real 2.5-day move. The edge
+  is real, not just synthetic.
+- Spread was TOO NARROW on the real move (widening keeps helping up to
+  x1.6 in the sweep). Changed: base spread coefficient 0.5 -> 0.6
+  (total spread ~13% wider on the final horizon). NOT chased further:
+  the sweep is confounded by the flat path's median bias (below), and
+  the final runs the trend path, whose spread is already larger.
+- Universal trophy: worst single error in v1's flat path (median 83.33
+  vs live 100.00), and in synD v1 lost to persistence (0.1386 vs
+  0.1123). Changed (trend path only, the one the final uses): median
+  99.9 -> 99.95 and spread pinned to 0.3. Verified on a synthetic
+  non-flat case: quantiles [99.9181, 99.9388, 99.95, 99.9591, 99.9695].
+  Live evidence: the trophy stayed 100.00% through a 6x refresh and two
+  more days — a wide spread on it is pure loss.
+- Median x0.7 also helps on this backtest (1.92) — NOT applied. It is a
+  flat-path artifact (N x6 prior + earner factors overestimate rates
+  when the real player growth is larger); the final runs the trend path,
+  which fits N and E from the actual reads instead of priors. Applying a
+  global 0.7 median scale to the trend path would be overfitting to the
+  flat path's failure mode.
+- Re-verified after the change: p00/p01 valid (55 rows, non-decreasing,
+  in range), two runs byte-identical, runtime 0.055 s for both cases.
+  Backtest v2: 2.1229 (was 2.1885).
+
+Honest limit: this backtest exercises the FLAT path (the only path a
+flat practice history triggers). The final runs the TREND path, so the
+backtest validates the spread/universal direction, not the trend fit
+itself. No #1 promise — same as before, but the two changes are each
+grounded in live evidence, not in a synthetic world.
