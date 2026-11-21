@@ -221,6 +221,7 @@ def _fit_earners(case, x_target, x_last, last_rates):
             tier_slopes.setdefault(trophy.get("tier", "bronze"), []).append(
                 min(max(raw[i][0], 0.0), 1.5))
     tier_mean = {t: sum(v) / len(v) for t, v in tier_slopes.items()}
+    n_last = float(hist[-1].get("players_tracked") or 1)
     slopes, resid_vars = [], []
     for i, trophy in enumerate(trophies):
         fit = raw[i]
@@ -230,7 +231,15 @@ def _fit_earners(case, x_target, x_last, last_rates):
             continue
         own = min(max(fit[0], 0.0), 1.5)
         mean = tier_mean.get(trophy.get("tier", "bronze"), own)
-        slopes.append(0.5 * own + 0.5 * mean)
+        # Precision-weighted shrinkage: a trophy with hundreds of
+        # earners has a slope worth trusting (early-story trophies grow
+        # explosively — Chapter 1 went 8 -> ~7,200 earners in 2.5 days
+        # on the live page); a trophy with a handful of earners does
+        # not, so it leans on its tier mean. Weight caps at 0.9 so the
+        # tier mean always keeps a say.
+        earners_last = last_rates[i] * n_last / 100.0
+        w = min(earners_last / (earners_last + 20.0), 0.9)
+        slopes.append(w * own + (1.0 - w) * mean)
         resid_vars.append(min(fit[2], 0.5))
     return slopes, resid_vars
 
