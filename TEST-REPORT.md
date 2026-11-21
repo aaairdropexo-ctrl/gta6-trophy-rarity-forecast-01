@@ -179,3 +179,25 @@ Re-verified after the change: p00/p01 valid (55 rows, non-decreasing,
 in range), two runs byte-identical, runtime 0.051 s for both cases.
 Live-page backtest unchanged at 2.1229 (flat path does not call
 `_fit_earners`, as expected).
+
+## 9. Improvement v4 (21 Nov ~18:05 WIB) — hoist timestamp parsing (speed)
+
+Robustness test first: the real final case will carry ~300 reads (every
+10 minutes for two days), but the entry had only ever run on 7-8 read
+histories. A reconstructed final-like history (336 reads: launch-night
+30-min reads, the 04:30 refresh rebuilt from the kit's stated sum,
+log-interpolated 10-min reads to the live page at N~40,000) runs clean:
+valid output, Chapter 1 median 25.75% (rising from 18.02% live, sane),
+universal trophy tight at 99.95. But runtime was 0.123 s for that one
+case — too close to the practice #1's 142 ms for comfort on a possibly
+throttled grading server, and run_ms is the tie-break.
+
+Change: log-time `x` per read is now computed once in `_forecast_case`
+and passed to `_fit_players` / `_fit_earners`. Before, `_fit_earners`
+re-parsed every read's timestamp for every trophy (55 x 336 parses).
+Pure refactor, no math changed — PROVEN score-neutral: p00/p01 outputs
+byte-identical to v3, and the 336-read output byte-identical to v3.
+
+Result: 336-read case 0.123 s -> 0.077 s (-37%). p00/p01 still
+~25 ms per case. Determinism holds (identical bytes across runs and
+across the refactor).
