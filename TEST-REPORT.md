@@ -144,3 +144,38 @@ flat practice history triggers). The final runs the TREND path, so the
 backtest validates the spread/universal direction, not the trend fit
 itself. No #1 promise — same as before, but the two changes are each
 grounded in live evidence, not in a synthetic world.
+
+## 8. Improvement v3 (21 Nov ~17:55 WIB) — precision-weighted slope shrinkage
+
+Problem: the trend path (the one the final uses) shrank every trophy's
+earner slope 50/50 toward its tier mean. That is fine for a trophy with
+4 earners, but it halves the slope of early-story trophies whose growth
+is explosive and well-measured — Chapter 1 went 8 -> ~7,200 earners in
+2.5 days on the live page, and the 50/50 shrink was dragging its day-7
+median down (14.93% on a reconstructed full history, below the 18.02%
+already seen live — i.e. v2 predicted Chapter 1 would FALL by day 7,
+against its whole trajectory).
+
+Change (`_fit_earners`): slope = w*own + (1-w)*tier_mean with
+w = min(E_last / (E_last + 20), 0.9). A trophy with hundreds of earners
+trusts its own slope; a trophy with a handful leans on its tier mean.
+The 0.9 cap keeps the tier mean a say in every case.
+
+Sensitivity (reconstructed plausible final history: p00 reads + 04:30
+refresh rebuilt from the kit's stated post-refresh sum 110.55 +
+log-interpolated reads to the live page, N_live estimated ~40,000 from
+the 0.01% floor constraint): mean |dlogit| of medians v2->v3 is 0.077,
+max 0.54 (Chapter 1: 14.93 -> 23.15; Baited My Tackle: 13.86 -> 21.49;
+Trust: 6.61 -> 10.25). Median sums: v2 146.4, v3 170.3, live 157.9.
+The change is small overall and moves exactly the trophies the live
+page proves are still climbing. Downside if wrong is bounded (~0.05-0.08
+mean logit on the moved trophies); upside if right is the same size
+the other way. No fair trend-path backtest exists (the intermediate
+reads between the refresh and the live page are not published, and
+inventing them would be circular), so this rests on principle + the
+live trajectory, stated honestly.
+
+Re-verified after the change: p00/p01 valid (55 rows, non-decreasing,
+in range), two runs byte-identical, runtime 0.051 s for both cases.
+Live-page backtest unchanged at 2.1229 (flat path does not call
+`_fit_earners`, as expected).
