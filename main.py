@@ -253,7 +253,7 @@ def _forecast_case(case, name):
     horizon_days = float(case["horizon_minutes"]) / 1440.0
     x_target = _x_of(case.get("target") or "")
     x_last = _x_of(hist[-1].get("slot") or hist[-1].get("at") or "")
-    base_spread = 0.5 * math.sqrt(horizon_days)
+    base_spread = 0.6 * math.sqrt(horizon_days)
     flat = _history_is_flat(case)
 
     if flat:
@@ -307,13 +307,21 @@ def _forecast_case(case, name):
         median = max(median, 0.01)
         if not flat and universal[i]:
             # The tier ceiling must not drag a proven-universal trophy
-            # back down: every read showed 100% while the base grew.
-            median = 99.9
+            # back down: every read showed 100% while the base grew,
+            # and the live page still showed 100.00% two days later.
+            # 99.95 (not 99.99) hedges the one way it can fall: brand-new
+            # players who have not fished yet at the moment of the read.
+            median = 99.95
 
         extra = 0.16 if earners_last < 10.0 else 0.0
         spread = math.sqrt(base_spread * base_spread + jump_var +
                            resid_vars[i] + extra)
         spread = min(max(spread, 0.3), 2.0)
+        if not flat and universal[i]:
+            # A trophy that never moved through a 6x refresh and two
+            # more days of live reads has almost no uncertainty left:
+            # a wide spread here is pure pinball loss.
+            spread = 0.3
         centre = _logit(median)
         quantiles = []
         prev = 0.0
